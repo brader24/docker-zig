@@ -1,15 +1,13 @@
-# Zig 0.17.0 toolchain for building Zig applications.
+# Zig 0.17.0 toolchain image for building Zig applications in other repos.
 #
-# Build:
+# Build and tag (from this directory):
 #   docker build -f Dockerfile.0.17.0 -t zig:0.17.0 .
 #
-# Compile an application from its source tree:
-#   docker run --rm -v ${PWD}:/src -w /src zig:0.17.0 zig build -Doptimize=ReleaseSafe
+# Use from an application repo (mount the app at /src):
+#   docker run --rm -it -v ${PWD}:/src zig:0.17.0
+#   docker run --rm -v ${PWD}:/src zig:0.17.0 zig build -Doptimize=ReleaseSafe
 #
-# Use as a base image:
-#   FROM zig:0.17.0
-#   COPY . /src
-#   RUN zig build -Doptimize=ReleaseSafe
+# See README.md for registry publish and VS Code Dev Container templates.
 
 FROM debian:stable-slim
 
@@ -21,13 +19,19 @@ ARG TARGETARCH
 
 ENV ZIG_VERSION=0.17.0 \
     ZIG_GLOBAL_CACHE_DIR=/var/cache/zig \
+    ZIG_LOCAL_CACHE_DIR=/tmp/zig-local-cache \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8 \
+    SHELL=/bin/bash \
     PATH="/usr/local/zig:${PATH}"
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
+        bash \
         ca-certificates \
         curl \
         git \
+        sudo \
         xz-utils \
     && rm -rf /var/lib/apt/lists/*
 
@@ -52,13 +56,25 @@ RUN set -eux; \
     mkdir -p /usr/local/zig; \
     tar -xJf "/tmp/${tarball}" --strip-components=1 -C /usr/local/zig; \
     rm "/tmp/${tarball}"; \
-    mkdir -p "${ZIG_GLOBAL_CACHE_DIR}"; \
     zig version
+
+ARG USERNAME=dev
+ARG USER_UID=1000
+ARG USER_GID=1000
+
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
+    && groupadd --gid "${USER_GID}" "${USERNAME}" \
+    && useradd --uid "${USER_UID}" --gid "${USER_GID}" -m -s /bin/bash "${USERNAME}" \
+    && echo "${USERNAME} ALL=(ALL) NOPASSWD:ALL" > "/etc/sudoers.d/${USERNAME}" \
+    && chmod 0440 "/etc/sudoers.d/${USERNAME}" \
+    && mkdir -p /src "${ZIG_GLOBAL_CACHE_DIR}" "${ZIG_LOCAL_CACHE_DIR}" \
+    && chown -R "${USERNAME}:${USERNAME}" /src "${ZIG_GLOBAL_CACHE_DIR}" "${ZIG_LOCAL_CACHE_DIR}" "/home/${USERNAME}"
 
 WORKDIR /src
 
-# Keep the local cache off bind-mounted source trees (Windows volume mounts
-# cannot rename Zig's cache tmp dirs in place).
-ENV ZIG_LOCAL_CACHE_DIR=/tmp/zig-local-cache
+USER ${USERNAME}
 
-CMD ["zig", "version"]
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+CMD []

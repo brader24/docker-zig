@@ -1,0 +1,33 @@
+{
+  "name": "Zig 0.17.0",
+  "image": "zig:0.17.0",
+  "workspaceFolder": "/src",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/src,type=bind,consistency=cached",
+  "remoteUser": "dev",
+  "overrideCommand": true,
+  "mounts": [
+    "source=zig-0.17-global-cache,target=/var/cache/zig,type=volume",
+    "source=zig-0.17-local-cache,target=/tmp/zig-local-cache,type=volume"
+  ],
+  "containerEnv": {
+    "ZIG_GLOBAL_CACHE_DIR": "/var/cache/zig",
+    "ZIG_LOCAL_CACHE_DIR": "/tmp/zig-local-cache"
+  },
+  "runArgs": [
+    "--cap-add=SYS_PTRACE",
+    "--security-opt=seccomp=unconfined"
+  ],
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ziglang.vscode-zig"
+      ],
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "zig.path": "/usr/local/zig/zig",
+        "zig.zls.enabled": "on"
+      }
+    }
+  },
+  "postCreateCommand": "sudo chown -R dev:dev /var/cache/zig /tmp/zig-local-cache && zig version"
+}
