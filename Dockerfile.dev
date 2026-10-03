@@ -1,0 +1,73 @@
+# Latest Zig development (master) toolchain for building Zig applications.
+#
+# Fetches the current master tarball from https://ziglang.org/download/index.json
+# at image build time. Rebuild with --no-cache or a new CACHE_BUST value to pick
+# up a newer nightly.
+#
+# Build:
+#   docker build -f Dockerfile.dev -t zig:dev .
+#   docker build -f Dockerfile.dev --build-arg CACHE_BUST=$(date -u +%Y-%m-%d) -t zig:dev .
+#
+# Compile an application from its source tree:
+#   docker run --rm -v ${PWD}:/src -w /src zig:dev zig build -Doptimize=ReleaseSafe
+#
+# Use as a base image:
+#   FROM zig:dev
+#   COPY . /src
+#   RUN zig build -Doptimize=ReleaseSafe
+
+FROM debian:stable-slim
+
+LABEL org.opencontainers.image.title="zig-dev"
+LABEL org.opencontainers.image.description="Latest Zig development build toolchain for building Zig applications"
+LABEL org.opencontainers.image.source="https://ziglang.org/download/"
+
+ARG TARGETARCH
+# Change this to invalidate the download layer and fetch a newer master build.
+ARG CACHE_BUST=0
+
+ENV ZIG_GLOBAL_CACHE_DIR=/var/cache/zig \
+    PATH="/usr/local/zig:${PATH}"
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        git \
+        jq \
+        xz-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN set -eux; \
+    echo "CACHE_BUST=${CACHE_BUST}"; \
+    arch="${TARGETARCH:-}"; \
+    if [ -z "${arch}" ]; then \
+        case "$(uname -m)" in \
+            x86_64) arch=amd64 ;; \
+            aarch64|arm64) arch=arm64 ;; \
+            *) echo "unsupported architecture: $(uname -m)" >&2; exit 1 ;; \
+        esac; \
+    fi; \
+    case "${arch}" in \
+        amd64) zig_arch=x86_64 ;; \
+        arm64) zig_arch=aarch64 ;; \
+        *) echo "unsupported architecture: ${arch}" >&2; exit 1 ;; \
+    esac; \
+    index="$(curl -fsSL --retry 5 --retry-delay 2 https://ziglang.org/download/index.json)"; \
+    key="${zig_arch}-linux"; \
+    tarball_url="$(printf '%s' "${index}" | jq -er --arg key "${key}" '.master[$key].tarball')"; \
+    zig_sha256="$(printf '%s' "${index}" | jq -er --arg key "${key}" '.master[$key].shasum')"; \
+    zig_version="$(printf '%s' "${index}" | jq -er '.master.version')"; \
+    echo "installing Zig ${zig_version} for ${key}"; \
+    curl -fsSL --retry 5 --retry-delay 2 -o /tmp/zig.tar.xz "${tarball_url}"; \
+    echo "${zig_sha256}  /tmp/zig.tar.xz" | sha256sum -c -; \
+    mkdir -p /usr/local/zig; \
+    tar -xJf /tmp/zig.tar.xz --strip-components=1 -C /usr/local/zig; \
+    rm /tmp/zig.tar.xz; \
+    mkdir -p "${ZIG_GLOBAL_CACHE_DIR}"; \
+    zig version; \
+    printf '%s\n' "${zig_version}" > /usr/local/zig/DEV_VERSION
+
+WORKDIR /src
+
+CMD ["zig", "version"]

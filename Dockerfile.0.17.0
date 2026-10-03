@@ -1,0 +1,60 @@
+# Zig 0.17.0 toolchain for building Zig applications.
+#
+# Build:
+#   docker build -f Dockerfile.0.17.0 -t zig:0.17.0 .
+#
+# Compile an application from its source tree:
+#   docker run --rm -v ${PWD}:/src -w /src zig:0.17.0 zig build -Doptimize=ReleaseSafe
+#
+# Use as a base image:
+#   FROM zig:0.17.0
+#   COPY . /src
+#   RUN zig build -Doptimize=ReleaseSafe
+
+FROM debian:stable-slim
+
+LABEL org.opencontainers.image.title="zig-0.17.0"
+LABEL org.opencontainers.image.description="Zig 0.17.0 toolchain for building Zig applications"
+LABEL org.opencontainers.image.source="https://ziglang.org/download/0.17.0/"
+
+ARG TARGETARCH
+
+ENV ZIG_VERSION=0.17.0 \
+    ZIG_GLOBAL_CACHE_DIR=/var/cache/zig \
+    PATH="/usr/local/zig:${PATH}"
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        git \
+        xz-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN set -eux; \
+    arch="${TARGETARCH:-}"; \
+    if [ -z "${arch}" ]; then \
+        case "$(uname -m)" in \
+            x86_64) arch=amd64 ;; \
+            aarch64|arm64) arch=arm64 ;; \
+            *) echo "unsupported architecture: $(uname -m)" >&2; exit 1 ;; \
+        esac; \
+    fi; \
+    case "${arch}" in \
+        amd64) zig_arch=x86_64; zig_sha256=1cbe9df9f27e6b78d14ccbca43b6703a404ef79ef1c463de901d7f088d4e2026 ;; \
+        arm64) zig_arch=aarch64; zig_sha256=9e8d11661d4ae3bd57702a3832781e23ad151dde5798e16a5ccd503f65234ff8 ;; \
+        *) echo "unsupported architecture: ${arch}" >&2; exit 1 ;; \
+    esac; \
+    tarball="zig-${zig_arch}-linux-${ZIG_VERSION}.tar.xz"; \
+    url="https://ziglang.org/download/${ZIG_VERSION}/${tarball}"; \
+    curl -fsSL --retry 5 --retry-delay 2 -o "/tmp/${tarball}" "${url}"; \
+    echo "${zig_sha256}  /tmp/${tarball}" | sha256sum -c -; \
+    mkdir -p /usr/local/zig; \
+    tar -xJf "/tmp/${tarball}" --strip-components=1 -C /usr/local/zig; \
+    rm "/tmp/${tarball}"; \
+    mkdir -p "${ZIG_GLOBAL_CACHE_DIR}"; \
+    zig version
+
+WORKDIR /src
+
+CMD ["zig", "version"]

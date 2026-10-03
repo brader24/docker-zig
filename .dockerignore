@@ -1,0 +1,6 @@
+.git
+.gitignore
+README.md
+.zig-cache
+zig-cache
+zig-out
