@@ -42,6 +42,7 @@ jobs:
           context: .
           file: ${{ matrix.file }}
           load: true
+          provenance: false
           tags: ${{ matrix.tag }}
           cache-from: type=gha,scope=${{ matrix.file }}
           cache-to: type=gha,mode=max,scope=${{ matrix.file }}
