@@ -142,3 +142,12 @@ RUN zig build -Doptimize=ReleaseSafe
 - Global cache: `/var/cache/zig`
 
 Override `ZIG_LOCAL_CACHE_DIR` / `ZIG_GLOBAL_CACHE_DIR` if you want the cache on a named volume from `docker run` as well.
+
+## CI
+
+GitHub Actions (`.github/workflows/docker.yml`) builds both images on push, pull request, and `workflow_dispatch`, then runs `scripts/test-image.sh`: compiler version, user `dev`, a detached keep-alive container, and `zig init` / `zig build` / `zig build test` / `zig build run`.
+
+```bash
+docker build -f Dockerfile.0.17.0 -t zig:0.17.0 .
+bash scripts/test-image.sh zig:0.17.0 0.17.0
+```

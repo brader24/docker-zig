@@ -1,9 +1,11 @@
 .git
 .gitattributes
 .gitignore
+.github
 README.md
 .devcontainer
 examples
+scripts
 .zig-cache
 zig-cache
 zig-out

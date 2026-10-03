@@ -1,0 +1,51 @@
+name: Docker
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: ${{ matrix.tag }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - file: Dockerfile.0.17.0
+            tag: zig:0.17.0
+            expected_version: "0.17.0"
+          - file: Dockerfile.dev
+            tag: zig:dev
+            expected_version: ""
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.file }}
+          load: true
+          tags: ${{ matrix.tag }}
+          cache-from: type=gha,scope=${{ matrix.file }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.file }}
+          build-args: ${{ matrix.file == 'Dockerfile.dev' && format('CACHE_BUST={0}', github.run_id) || '' }}
+
+      - name: Test
+        run: bash scripts/test-image.sh "${{ matrix.tag }}" "${{ matrix.expected_version }}"
