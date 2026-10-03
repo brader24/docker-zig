@@ -46,3 +46,5 @@ RUN zig build -Doptimize=ReleaseSafe
 ```
 
 The compiler is on `PATH` at `/usr/local/zig/zig`.
+
+Local build cache lives at `/tmp/zig-local-cache` so bind-mounted source trees (including Docker Desktop on Windows) work with `zig build`. Override `ZIG_LOCAL_CACHE_DIR` / `ZIG_GLOBAL_CACHE_DIR` if you want the cache on a named volume.

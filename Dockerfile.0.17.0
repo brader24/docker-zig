@@ -57,4 +57,8 @@ RUN set -eux; \
 
 WORKDIR /src
 
+# Keep the local cache off bind-mounted source trees (Windows volume mounts
+# cannot rename Zig's cache tmp dirs in place).
+ENV ZIG_LOCAL_CACHE_DIR=/tmp/zig-local-cache
+
 CMD ["zig", "version"]
