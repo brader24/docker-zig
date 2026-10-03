@@ -25,7 +25,10 @@ cleanup() {
         docker volume rm -f "${vol}" >/dev/null 2>&1 || true
     fi
     if [[ -n "${appdir}" && -d "${appdir}" ]]; then
-        chmod -R a+rwx "${appdir}" 2>/dev/null || true
+        # Files created as uid 1000 are not removable by the GitHub runner
+        # (uid 1001). chmod as root on the bind-mount first.
+        docker run --rm --user 0 -v "${appdir}:/src" "${image}" \
+            chmod -R a+rwx /src >/dev/null 2>&1 || true
         rm -rf "${appdir}" || true
     fi
 }
